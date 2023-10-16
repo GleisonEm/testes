@@ -1,0 +1,84 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
+)
+
+type Res struct {
+	AwemeList []struct {
+		Video struct {
+			DownloadAddr struct {
+				URLList []string `json:"url_list"`
+			} `json:"download_addr"`
+			PlayAddr struct {
+				URLList []string `json:"url_list"`
+			} `json:"play_addr"`
+		} `json:"video"`
+	} `json:"aweme_list"`
+}
+
+func getVideo(url string, noWm bool) (data map[string]string, err error) {
+	id, err := getVideoID(url)
+	if err != nil {
+		return
+	}
+	API_URL := fmt.Sprintf("https://api16-normal-c-useast1a.tiktokv.com/aweme/v1/feed/?aweme_id=%s", id)
+
+	req, _ := http.NewRequest("GET", API_URL, nil)
+	req.Header.Set("User-Agent", "TikTok 26.2.0 rv:262018 (iPhone; iOS 14.4.2; en_US) Cronet")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	var res Res
+	json.Unmarshal(body, &res)
+
+	var urlMedia string
+	if noWm {
+		urlMedia = res.AwemeList[0].Video.PlayAddr.URLList[0]
+	} else {
+		urlMedia = res.AwemeList[0].Video.DownloadAddr.URLList[0]
+	}
+
+	fmt.Println("teste:", urlMedia)
+	data = map[string]string{
+		"url": urlMedia,
+		"id":  id,
+	}
+	return
+}
+
+func getVideoID(url string) (id string, err error) {
+	if !strings.Contains(url, "/video/") {
+		err = errors.New("Invalid URL")
+		return
+	}
+
+	id = url[strings.Index(url, "/video/")+7:]
+	if len(id) > 19 {
+		id = id[0:strings.Index(id, "?")]
+	}
+	return
+}
+
+
+func main() {
+	// Invoke the functions here like getVideoWm(), getVideoNoWm() with required parameters
+	url := "https://www.tiktok.com/@giolucca/video/7272923944989052165" // Substitua pela sua URL
+	data, err := getVideo(url, false)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	fmt.Printf("Video URL: %s\nVideo ID: %s\n", data.URL, data.ID)
+}
